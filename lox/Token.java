@@ -1,7 +1,6 @@
 package lox;
 
 public class Token {
-    // TODO: reimplement token location to be the offset (from the beginning of the file) and the token length
     public final TokenType type;
     public final String lexeme;
     public final Object literal;
