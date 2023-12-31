@@ -3,6 +3,7 @@ expression → literal
            | binary
            | grouping ;
 
+
 literal    → NUMBER | STRING | "true" | "false" | "nil" ;
 grouping   → "(" expression ")" ;
 unary      → ( "-" | "!" ) expression ;
@@ -10,13 +11,31 @@ binary     → expression operator expression ;
 operator   → "==" | "!=" | "<" | "<=" | ">" | ">="
            | "+"  | "-"  | "*" | "/" ;
 
+program        → statement* EOF ;
 
-expression     → equality ;
+declaration    → varDecl
+               | statement ;
+
+statement      → exprStmt
+               | printStmt
+               | block ;
+
+block          → "{" declaration* "}" ;
+
+varDecl        → "var" IDENTIFIER ( "=" expression )? ";" ;
+exprStmt       → expression ";" ;
+printStmt      → "print" expression ";" ;
+
+expression     → assignment ;
+assignment     → IDENTIFIER "=" assignment
+               | equality ;
 equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" ) unary )* ;
 unary          → ( "!" | "-" ) unary ;
                | primary ;
-primary        → NUMBER | STRING | "true" | "false" | "nil"
-               | "(" expression ")" ;
+primary        → "true" | "false" | "nil"
+               | NUMBER | STRING
+               | "(" expression ")"
+               | IDENTIFIER ;

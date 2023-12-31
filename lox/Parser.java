@@ -1,6 +1,9 @@
 package lox;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
 import static lox.TokenType.*;
 
@@ -13,20 +16,20 @@ public class Parser {
         this.tokens = tokens;
     }
 
-    Expr parse() {
-        try {
-            return expression();
-        } catch (ParseError error) {
-            return null;
+    public List<Stmt> parse() {
+        List<Stmt> statements = new ArrayList<>();
+        while (!isAtEnd()) {
+            statements.add(declaration());
         }
+        return statements;
     }
 
-    private Expr binaryOperation(Expr expr, TokenType[] tokenTypes) {
-        Expr expression = expr;
+    private Expr binaryOperation(Supplier<Expr> expr, TokenType[] tokenTypes) {
+        Expr expression = expr.get();
 
         while (match(tokenTypes)) {
             Token operator = previous();
-            expression = new Expr.Binary(expression, operator, expr);
+            expression = new Expr.Binary(expression, operator, expr.get());
         }
 
         return expression;
@@ -38,6 +41,10 @@ public class Parser {
 
     private Token peek() {
         return tokens.get(current);
+    }
+
+    private Token peekNext() {
+        return tokens.get(current + 1);
     }
 
     private Token previous() {
@@ -95,24 +102,100 @@ public class Parser {
         }
     }
 
+    private Stmt declaration() {
+        try {
+            if (match(VAR)) return varDeclaration();
+            return statement();
+        } catch (ParseError error) {
+            synchronize();
+            return null;
+        }
+    }
+
+    private Stmt varDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect variable name.");
+
+        Expr initializer = null;
+        if (match(EQUAL)) {
+            initializer = expression();
+        }
+
+        consume(SEMICOLON, "Expect ';' after variable declaration.");
+        return new Stmt.Var(name, initializer);
+    }
+
+    private Stmt statement() {
+        if (match(PRINT)) return printStatement();
+        if (match(LEFT_BRACE)) return new Stmt.Block(block());
+        return expressionStatement();
+    }
+
+    private Stmt printStatement() {
+        Expr value = expression();
+//        if (!(value instanceof Expr.Literal)) {
+//            value = expression();
+//            return new Stmt.Print((new Stmt.Expression(value)).expression);
+//        }
+        consume(SEMICOLON, "Expect ';' after value.");
+        return new Stmt.Print(value);
+    }
+
+    private Stmt expressionStatement() {
+        Expr expr = expression();
+        consume(SEMICOLON, "Expect ';' after expression.");
+        return new Stmt.Expression(expr);
+    }
+
+    private List<Stmt> block() {
+        List<Stmt> statements = new ArrayList<>();
+
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            statements.add(declaration());
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after block.");
+        return statements;
+    }
+
+
     private Expr expression() {
-        return equality();
+        return assignment();
+    }
+
+    private Expr assignment() {
+        Expr expr = equality();
+
+        if (match(EQUAL)) {
+            Token equals = previous();
+            Expr value = assignment();
+
+            if (expr instanceof Expr.Variable) {
+                Token name = ((Expr.Variable)expr).name;
+                return new Expr.Assign(name, value);
+            }
+
+            // We report an error if the left-hand side isn’t a valid assignment target,
+            // but we don’t throw it because the parser isn’t in a confused state where we need to go into panic mode and synchronize.
+            error(equals, "Invalid assignment target.");
+        }
+
+        return expr;
     }
 
     private Expr equality() {
-        return binaryOperation(comparison(), new TokenType[]{BANG_EQUAL, EQUAL_EQUAL});
+        return binaryOperation(this::comparison, new TokenType[]{BANG_EQUAL, EQUAL_EQUAL});
     }
 
     private Expr comparison() {
-        return binaryOperation(term(), new TokenType[]{GREATER, GREATER_EQUAL, LESS, LESS_EQUAL});
+        return binaryOperation(this::term, new TokenType[]{GREATER, GREATER_EQUAL, LESS, LESS_EQUAL});
     }
 
     private Expr term() {
-        return binaryOperation(factor(), new TokenType[]{MINUS, PLUS});
+        return binaryOperation(this::factor, new TokenType[]{MINUS, PLUS});
     }
 
     private Expr factor() {
-        return binaryOperation(unary(), new TokenType[]{SLASH, STAR});
+        return binaryOperation(this::unary, new TokenType[]{SLASH, STAR});
     }
 
     private Expr unary() {
@@ -131,6 +214,10 @@ public class Parser {
 
         if (match(NUMBER, STRING)) {
             return new Expr.Literal(previous().literal);
+        }
+
+        if (match(IDENTIFIER)) {
+            return new Expr.Variable(previous());
         }
 
         if (match(LEFT_PAREN)) {

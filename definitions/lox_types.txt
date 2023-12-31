@@ -1,0 +1,7 @@
+Lox type 	   |  Java representation
+------------------------------------
+Any Lox value  |	 Object
+nil 	       |     null
+Boolean 	   |     Boolean
+number 	       |     Double
+string 	       |     String
