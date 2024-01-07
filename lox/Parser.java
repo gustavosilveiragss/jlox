@@ -1,8 +1,8 @@
 package lox;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.function.Supplier;
 
 import static lox.TokenType.*;
@@ -22,17 +22,6 @@ public class Parser {
             statements.add(declaration());
         }
         return statements;
-    }
-
-    private Expr binaryOperation(Supplier<Expr> expr, TokenType[] tokenTypes) {
-        Expr expression = expr.get();
-
-        while (match(tokenTypes)) {
-            Token operator = previous();
-            expression = new Expr.Binary(expression, operator, expr.get());
-        }
-
-        return expression;
     }
 
     private boolean isAtEnd() {
@@ -125,17 +114,30 @@ public class Parser {
     }
 
     private Stmt statement() {
+        if (match(IF)) return ifStatement();
         if (match(PRINT)) return printStatement();
         if (match(LEFT_BRACE)) return new Stmt.Block(block());
         return expressionStatement();
     }
 
+    private Stmt ifStatement() {
+        consume(LEFT_PAREN, "Expect '(' after 'if'.");
+        Expr condition = expression();
+        consume(RIGHT_PAREN, "Expect ')' after if condition.");
+
+        Stmt thenBranch = statement();
+
+        // Dangling else problem: we just consider the else branch to be attached to the nearest if statement
+        Stmt elseBranch = null;
+        if (match(ELSE)) {
+            elseBranch = statement();
+        }
+
+        return new Stmt.If(condition, thenBranch, elseBranch);
+    }
+
     private Stmt printStatement() {
         Expr value = expression();
-//        if (!(value instanceof Expr.Literal)) {
-//            value = expression();
-//            return new Stmt.Print((new Stmt.Expression(value)).expression);
-//        }
         consume(SEMICOLON, "Expect ';' after value.");
         return new Stmt.Print(value);
     }
@@ -148,11 +150,9 @@ public class Parser {
 
     private List<Stmt> block() {
         List<Stmt> statements = new ArrayList<>();
-
         while (!check(RIGHT_BRACE) && !isAtEnd()) {
             statements.add(declaration());
         }
-
         consume(RIGHT_BRACE, "Expect '}' after block.");
         return statements;
     }
@@ -163,7 +163,7 @@ public class Parser {
     }
 
     private Expr assignment() {
-        Expr expr = equality();
+        Expr expr = or();
 
         if (match(EQUAL)) {
             Token equals = previous();
@@ -182,20 +182,28 @@ public class Parser {
         return expr;
     }
 
+    private Expr or() {
+        return logicalOperation(this::and, OR);
+    }
+
+    private Expr and() {
+        return logicalOperation(this::equality, AND);
+    }
+
     private Expr equality() {
-        return binaryOperation(this::comparison, new TokenType[]{BANG_EQUAL, EQUAL_EQUAL});
+        return binaryOperation(this::comparison, BANG_EQUAL, EQUAL_EQUAL);
     }
 
     private Expr comparison() {
-        return binaryOperation(this::term, new TokenType[]{GREATER, GREATER_EQUAL, LESS, LESS_EQUAL});
+        return binaryOperation(this::term, GREATER, GREATER_EQUAL, LESS, LESS_EQUAL);
     }
 
     private Expr term() {
-        return binaryOperation(this::factor, new TokenType[]{MINUS, PLUS});
+        return binaryOperation(this::factor, MINUS, PLUS);
     }
 
     private Expr factor() {
-        return binaryOperation(this::unary, new TokenType[]{SLASH, STAR});
+        return binaryOperation(this::unary, SLASH, STAR);
     }
 
     private Expr unary() {
@@ -227,5 +235,28 @@ public class Parser {
         }
 
         throw error(peek(), "Expect expression.");
+    }
+
+    // Created these two helper methods to avoid code duplication, while having some amount of separation of concerns
+    private Expr logicalOperation(Supplier<Expr> expr, TokenType... tokenTypes) {
+        Expr expression = expr.get();
+
+        while (match(tokenTypes)) {
+            Token operator = previous();
+            expression = new Expr.Logical(expression, operator, expr.get());
+        }
+
+        return expression;
+    }
+
+    private Expr binaryOperation(Supplier<Expr> expr, TokenType... tokenTypes) {
+        Expr expression = expr.get();
+
+        while (match(tokenTypes)) {
+            Token operator = previous();
+            expression = new Expr.Binary(expression, operator, expr.get());
+        }
+
+        return expression;
     }
 }
