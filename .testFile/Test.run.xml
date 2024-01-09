@@ -1,0 +1,10 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Test" type="Application" factoryName="Application">
+    <option name="MAIN_CLASS_NAME" value="lox.Lox" />
+    <module name="jlox" />
+    <option name="PROGRAM_PARAMETERS" value="tests/function/counter.lox" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

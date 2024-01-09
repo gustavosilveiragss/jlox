@@ -1,15 +1,14 @@
-expression → literal
-           | unary
-           | binary
-           | grouping ;
+expression     → literal
+               | unary
+               | binary
+               | grouping ;
 
-
-literal    → NUMBER | STRING | "true" | "false" | "nil" ;
-grouping   → "(" expression ")" ;
-unary      → ( "-" | "!" ) expression ;
-binary     → expression operator expression ;
-operator   → "==" | "!=" | "<" | "<=" | ">" | ">="
-           | "+"  | "-"  | "*" | "/" ;
+literal        → NUMBER | STRING | "true" | "false" | "nil" ;
+grouping       → "(" expression ")" ;
+unary          → ( "-" | "!" ) expression ;
+binary         → expression operator expression ;
+operator       → "==" | "!=" | "<" | "<=" | ">" | ">="
+               | "+"  | "-"  | "*" | "/" ;
 
 program        → statement* EOF ;
 
@@ -22,6 +21,7 @@ statement      → exprStmt
                | forStmt
                | ifStmt
                | printStmt
+               | returnStmt
                | whileStmt
                | block ;
 
@@ -32,6 +32,7 @@ forStmt        → "for" "(" ( varDecl | exprStmt | ";" )
 ifStmt         → "if" "(" expression ")" statement
                ( "else" statement )? ;
 printStmt      → "print" expression ";" ;
+returnStmt     → "return" expression? ";" ;
 whileStmt      → "while" "(" expression ")" statement ;
 block          → "{" declaration* "}" ;
 
@@ -44,9 +45,19 @@ equality       → comparison ( ( "!=" | "==" ) comparison )* ;
 comparison     → term ( ( ">" | ">=" | "<" | "<=" ) term )* ;
 term           → factor ( ( "-" | "+" ) factor )* ;
 factor         → unary ( ( "/" | "*" ) unary )* ;
-unary          → ( "!" | "-" ) unary ;
-               | primary ;
+unary          → ( "!" | "-" ) unary | call ;
+call           → primary ( "(" arguments? ")" )* ;
+arguments      → expression ( "," expression )* ;
 primary        → "true" | "false" | "nil"
                | NUMBER | STRING
                | "(" expression ")"
                | IDENTIFIER ;
+
+declaration    → funDecl
+               | varDecl
+               | statement ;
+
+funDecl        → "fun" function ;
+function       → IDENTIFIER "(" parameters? ")" block ;
+parameters     → IDENTIFIER ( "," IDENTIFIER )* ;
+
