@@ -89,6 +89,7 @@ public class Parser {
 
     private Stmt declaration() {
         try {
+            if (match(CLASS)) return classDeclaration();
             if (match(FUN)) return function("function");
             if (match(VAR)) return varDeclaration();
             return statement();
@@ -96,6 +97,20 @@ public class Parser {
             synchronize();
             return null;
         }
+    }
+
+    private Stmt classDeclaration() {
+        Token name = consume(IDENTIFIER, "Expect class name.");
+        consume(LEFT_BRACE, "Expect '{' before class body.");
+
+        List<Stmt.Function> methods = new ArrayList<>();
+        while (!check(RIGHT_BRACE) && !isAtEnd()) {
+            methods.add(function("method"));
+        }
+
+        consume(RIGHT_BRACE, "Expect '}' after class body.");
+
+        return new Stmt.Class(name, methods);
     }
 
     private Stmt varDeclaration() {
@@ -254,6 +269,11 @@ public class Parser {
                 return new Expr.Assign(name, value);
             }
 
+            if (expr instanceof Expr.Get) {
+                Expr.Get get = (Expr.Get) expr;
+                return new Expr.Set(get.object, get.name, value);
+            }
+
             // We report an error if the left-hand side isn’t a valid assignment target,
             // but we don’t throw it because the parser isn’t in a confused state where we need to go into panic mode and synchronize.
             error(equals, "Invalid assignment target.");
@@ -297,8 +317,17 @@ public class Parser {
 
     private Expr call() {
         Expr expr = primary();
-        while (match(LEFT_PAREN)) {
-            expr = finishCall(expr);
+        while (true) {
+            if (match(LEFT_PAREN)) {
+                expr = finishCall(expr);
+                continue;
+            }
+            if (match(DOT)) {
+                Token name = consume(IDENTIFIER, "Expect property name after '.'.");
+                expr = new Expr.Get(expr, name);
+                continue;
+            }
+            break;
         }
         return expr;
     }
@@ -323,13 +352,9 @@ public class Parser {
         if (match(TRUE)) return new Expr.Literal(true);
         if (match(NIL)) return new Expr.Literal(null);
 
-        if (match(NUMBER, STRING)) {
-            return new Expr.Literal(previous().literal);
-        }
-
-        if (match(IDENTIFIER)) {
-            return new Expr.Variable(previous());
-        }
+        if (match(NUMBER, STRING)) return new Expr.Literal(previous().literal);
+        if (match(THIS)) return new Expr.This(previous());
+        if (match(IDENTIFIER)) return new Expr.Variable(previous());
 
         if (match(LEFT_PAREN)) {
             Expr expr = expression();
